@@ -22,9 +22,10 @@ type ToolConfig struct {
 // MCPServer represents a discovered MCP server entry.
 type MCPServer struct {
 	Name          string            `json:"name"`
-	Tool          string            `json:"tool"`             // Which AI tool config this came from
-	ConfigPath    string            `json:"config_path"`      // File where this was found
-	Type          string            `json:"type"`             // stdio, http, sse, url
+	Tool          string            `json:"tool"`              // Which AI tool config this came from
+	ConfigPath    string            `json:"config_path"`       // File where this was found
+	Project       string            `json:"project,omitempty"` // Project path (for per-project configs like ~/.claude.json)
+	Type          string            `json:"type"`              // stdio, http, sse, url
 	Command       string            `json:"command,omitempty"`
 	Args          []string          `json:"args,omitempty"`
 	URL           string            `json:"url,omitempty"`
@@ -66,16 +67,27 @@ func Scan(paths *PathConfig) *ScanResult {
 		Username: username,
 	}
 
+	// Track already-scanned absolute paths to avoid duplicates when
+	// a global path (e.g. ~/.cursor/mcp.json) and a project-relative
+	// path (e.g. .cursor/mcp.json) resolve to the same file.
+	scannedPaths := make(map[string]bool)
+
 	platformPaths := paths.GetPlatformPaths(runtime.GOOS)
 
 	for _, toolDef := range platformPaths {
 		for _, configPath := range toolDef.ConfigPaths {
 			expanded := expandPath(configPath)
-			tc := scanConfigFile(toolDef.Tool, expanded)
+			absPath, err := filepath.Abs(expanded)
+			if err != nil {
+				absPath = expanded
+			}
+
+			tc := scanConfigFile(toolDef.Tool, absPath)
 			result.ToolConfigs = append(result.ToolConfigs, tc)
 
-			if tc.Exists && tc.Readable {
-				servers := extractMCPServers(toolDef.Tool, expanded)
+			if tc.Exists && tc.Readable && !scannedPaths[absPath] {
+				scannedPaths[absPath] = true
+				servers := extractMCPServers(toolDef.Tool, absPath)
 				result.MCPServers = append(result.MCPServers, servers...)
 			}
 		}
@@ -143,31 +155,55 @@ func extractMCPServers(tool, path string) []MCPServer {
 		return nil
 	}
 
-	var servers []MCPServer
-
-	// Try to parse as JSON (covers most AI tool configs)
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil
 	}
 
-	// Look for mcpServers key (Claude Code, Claude Desktop, Cursor, VS Code)
-	mcpServersRaw, ok := raw["mcpServers"]
-	if !ok {
-		return nil
+	var servers []MCPServer
+
+	// Check for top-level mcpServers (Cursor, Claude Desktop, VS Code, .mcp.json)
+	if mcpServersRaw, ok := raw["mcpServers"]; ok {
+		servers = append(servers, parseMCPServersMap(tool, path, "", mcpServersRaw)...)
 	}
 
+	// Check for projects.*.mcpServers (Claude Code ~/.claude.json)
+	if projectsRaw, ok := raw["projects"]; ok {
+		var projects map[string]json.RawMessage
+		if err := json.Unmarshal(projectsRaw, &projects); err == nil {
+			for projectPath, projectRaw := range projects {
+				var project map[string]json.RawMessage
+				if err := json.Unmarshal(projectRaw, &project); err != nil {
+					continue
+				}
+				if mcpServersRaw, ok := project["mcpServers"]; ok {
+					servers = append(servers, parseMCPServersMap(tool, path, projectPath, mcpServersRaw)...)
+				}
+			}
+		}
+	}
+
+	return servers
+}
+
+// parseMCPServersMap parses a {"serverName": {...}} map into MCPServer entries.
+// projectPath is set when the servers come from a per-project config (e.g. ~/.claude.json projects).
+func parseMCPServersMap(tool, configPath, projectPath string, mcpServersRaw json.RawMessage) []MCPServer {
 	var mcpServers map[string]json.RawMessage
 	if err := json.Unmarshal(mcpServersRaw, &mcpServers); err != nil {
 		return nil
 	}
 
+	var servers []MCPServer
 	for name, serverRaw := range mcpServers {
 		server := MCPServer{
 			Name:       name,
 			Tool:       tool,
-			ConfigPath: path,
+			ConfigPath: configPath,
 			RawConfig:  serverRaw,
+		}
+		if projectPath != "" {
+			server.Project = projectPath
 		}
 
 		var serverMap map[string]interface{}

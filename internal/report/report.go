@@ -97,6 +97,9 @@ func printMCPServers(result *scanner.ScanResult) {
 	for _, s := range result.MCPServers {
 		fmt.Printf("  [%s] %s\n", s.Type, s.Name)
 		fmt.Printf("    Tool: %s\n", s.Tool)
+		if s.Project != "" {
+			fmt.Printf("    Project: %s\n", s.Project)
+		}
 		if s.Command != "" {
 			fmt.Printf("    Command: %s\n", s.Command)
 		}
