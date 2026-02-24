@@ -1,0 +1,62 @@
+name: Update Homebrew Tap
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release info
+        id: release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Download release assets and compute checksums
+        run: |
+          TAG=${{ steps.release.outputs.TAG }}
+          BASE="https://github.com/claud3/agentshield/releases/download/${TAG}"
+
+          curl -sSfL "${BASE}/agentshield-scan-darwin-arm64" -o darwin-arm64
+          curl -sSfL "${BASE}/agentshield-scan-darwin-amd64" -o darwin-amd64
+          curl -sSfL "${BASE}/agentshield-scan-linux-arm64" -o linux-arm64
+          curl -sSfL "${BASE}/agentshield-scan-linux-amd64" -o linux-amd64
+
+          echo "SHA_DARWIN_ARM64=$(sha256sum darwin-arm64 | awk '{print $1}')" >> $GITHUB_ENV
+          echo "SHA_DARWIN_AMD64=$(sha256sum darwin-amd64 | awk '{print $1}')" >> $GITHUB_ENV
+          echo "SHA_LINUX_ARM64=$(sha256sum linux-arm64 | awk '{print $1}')" >> $GITHUB_ENV
+          echo "SHA_LINUX_AMD64=$(sha256sum linux-amd64 | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: claud3/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          VERSION=${{ steps.release.outputs.VERSION }}
+          FORMULA="homebrew-tap/Formula/agentshield-scan.rb"
+
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" "$FORMULA"
+          sed -i "s/PLACEHOLDER_DARWIN_ARM64/${SHA_DARWIN_ARM64}/" "$FORMULA"
+          sed -i "s/PLACEHOLDER_DARWIN_AMD64/${SHA_DARWIN_AMD64}/" "$FORMULA"
+          sed -i "s/PLACEHOLDER_LINUX_ARM64/${SHA_LINUX_ARM64}/" "$FORMULA"
+          sed -i "s/PLACEHOLDER_LINUX_AMD64/${SHA_LINUX_AMD64}/" "$FORMULA"
+
+          # Also replace any previous real hashes
+          cd homebrew-tap
+          git diff
+
+      - name: Push formula update
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agentshield-scan.rb
+          git commit -m "Update agentshield-scan to ${{ steps.release.outputs.VERSION }}"
+          git push

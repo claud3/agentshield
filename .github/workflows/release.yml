@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build all targets
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+
+          GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o dist/agentshield-scan-darwin-arm64 ./cmd/agentshield-scan/
+          GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/agentshield-scan-darwin-amd64 ./cmd/agentshield-scan/
+          GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/agentshield-scan-linux-amd64 ./cmd/agentshield-scan/
+          GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o dist/agentshield-scan-linux-arm64 ./cmd/agentshield-scan/
+          GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o dist/agentshield-scan-windows-amd64.exe ./cmd/agentshield-scan/
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/agentshield-scan-*
+            dist/checksums.txt
