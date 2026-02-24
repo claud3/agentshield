@@ -297,15 +297,16 @@ func TestDeduplication(t *testing.T) {
 	path2 := filepath.Join(dir, "global.json") // same absolute path
 	os.WriteFile(path1, []byte(config), 0644)
 
-	paths := &PathConfig{
-		MacOS: PlatformConfig{
-			Tools: []ToolPaths{
-				{
-					Tool:        "cursor",
-					ConfigPaths: []string{path1, path2},
-				},
-			},
+	toolPaths := []ToolPaths{
+		{
+			Tool:        "cursor",
+			ConfigPaths: []string{path1, path2},
 		},
+	}
+	paths := &PathConfig{
+		MacOS:   PlatformConfig{Tools: toolPaths},
+		Linux:   PlatformConfig{Tools: toolPaths},
+		Windows: PlatformConfig{Tools: toolPaths},
 	}
 
 	result := Scan(paths)
