@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/claud3/agentshield/internal/compliance"
 	"github.com/claud3/agentshield/internal/scanner"
 	"github.com/claud3/agentshield/internal/secrets"
 	"golang.org/x/term"
@@ -35,10 +36,11 @@ func init() {
 	}
 }
 
-// Result combines scan results and security findings.
+// Result combines scan results, security findings, and benchmark report.
 type Result struct {
-	ScanResult *scanner.ScanResult `json:"scan_result"`
-	Findings   []secrets.Finding   `json:"findings"`
+	ScanResult *scanner.ScanResult        `json:"scan_result"`
+	Findings   []secrets.Finding          `json:"findings"`
+	Benchmark  *compliance.BenchmarkReport `json:"benchmark,omitempty"`
 }
 
 // HasCriticalFindings returns true if any finding is critical severity.
@@ -58,6 +60,9 @@ func PrintTerminal(r Result) {
 	printMCPServers(r.ScanResult)
 	printManagedConfigs(r.ScanResult)
 	printFindings(r.Findings)
+	if r.Benchmark != nil {
+		printBenchmark(r.Benchmark)
+	}
 	printFooter(r)
 }
 
@@ -242,13 +247,108 @@ func printFindings(findings []secrets.Finding) {
 	}
 }
 
+func printBenchmark(b *compliance.BenchmarkReport) {
+	fmt.Printf("%s── MCP Security Benchmark ────────────────────────────────%s\n", colorDim, colorReset)
+
+	// Maturity level with color
+	maturityColor := colorRed
+	switch b.MaturityLevel {
+	case 3:
+		maturityColor = colorGreen
+	case 4:
+		maturityColor = colorGreen
+	case 2:
+		maturityColor = colorYellow
+	}
+	fmt.Printf("  Maturity Level:  %s%s%d — %s%s\n", colorBold, maturityColor, b.MaturityLevel, b.MaturityName, colorReset)
+	fmt.Printf("  Score:           %s%d/100%s\n", colorBold, b.Score, colorReset)
+	fmt.Println()
+
+	// Category summary
+	categories := []struct {
+		name  string
+		count compliance.CategoryCount
+	}{
+		{"Credential Security", b.Summary.CredentialSecurity},
+		{"Transport Security", b.Summary.TransportSecurity},
+		{"Authentication", b.Summary.Authentication},
+		{"Supply Chain", b.Summary.SupplyChain},
+		{"Governance", b.Summary.Governance},
+		{"Operational Hygiene", b.Summary.OperationalHygiene},
+	}
+
+	for _, cat := range categories {
+		total := cat.count.Pass + cat.count.Fail + cat.count.Warn
+		if total == 0 {
+			continue
+		}
+
+		statusIcon := fmt.Sprintf("%s✓%s", colorGreen, colorReset)
+		if cat.count.Fail > 0 {
+			statusIcon = fmt.Sprintf("%s✗%s", colorRed, colorReset)
+		} else if cat.count.Warn > 0 {
+			statusIcon = fmt.Sprintf("%s!%s", colorYellow, colorReset)
+		}
+
+		fmt.Printf("  %s %-24s", statusIcon, cat.name)
+		parts := []string{}
+		if cat.count.Pass > 0 {
+			parts = append(parts, fmt.Sprintf("%s%d passed%s", colorGreen, cat.count.Pass, colorReset))
+		}
+		if cat.count.Fail > 0 {
+			parts = append(parts, fmt.Sprintf("%s%d failed%s", colorRed, cat.count.Fail, colorReset))
+		}
+		if cat.count.Warn > 0 {
+			parts = append(parts, fmt.Sprintf("%s%d warning%s", colorYellow, cat.count.Warn, colorReset))
+		}
+		fmt.Println(strings.Join(parts, ", "))
+	}
+	fmt.Println()
+
+	// Show failed/warned checks
+	failed := b.FailedChecks()
+	if len(failed) > 0 {
+		fmt.Printf("  %sFindings:%s\n", colorBold, colorReset)
+		fmt.Println()
+		for _, c := range failed {
+			tagColor := colorYellow
+			switch c.Severity {
+			case compliance.SevCritical, compliance.SevHigh:
+				tagColor = colorRed
+			case compliance.SevInfo:
+				tagColor = colorDim
+			}
+			statusTag := "FAIL"
+			if c.Status == compliance.StatusWarn {
+				statusTag = "WARN"
+			}
+			fmt.Printf("  %s[%s]%s %s%s%s %s\n", tagColor, c.ID, colorReset, tagColor, statusTag, colorReset, c.Name)
+			if c.Details != "" {
+				fmt.Printf("         %s%s%s\n", colorDim, c.Details, colorReset)
+			}
+			if c.ServerName != "" {
+				fmt.Printf("         %sServer: %s%s\n", colorDim, c.ServerName, colorReset)
+			}
+			if c.Remediation != "" {
+				fmt.Printf("         %sFix: %s%s\n", colorDim, c.Remediation, colorReset)
+			}
+			fmt.Println()
+		}
+	}
+}
+
 func printFooter(r Result) {
 	fmt.Printf("%s──────────────────────────────────────────────────────────%s\n", colorDim, colorReset)
 	if r.HasCriticalFindings() {
 		fmt.Printf("  %s%sACTION REQUIRED:%s Critical credential exposures found.\n", colorBold, colorRed, colorReset)
 		fmt.Printf("  Rotate the affected credentials immediately.\n")
+	} else if r.Benchmark != nil && r.Benchmark.MaturityLevel >= 3 {
+		fmt.Printf("  %sScan complete. No critical issues. Maturity: Level %d (%s).%s\n",
+			colorGreen, r.Benchmark.MaturityLevel, r.Benchmark.MaturityName, colorReset)
 	} else if len(r.Findings) > 0 {
 		fmt.Printf("  %sReview the findings above and address as needed.%s\n", colorYellow, colorReset)
+	} else if r.Benchmark != nil {
+		fmt.Printf("  %sScan complete. Review benchmark findings to improve maturity.%s\n", colorYellow, colorReset)
 	} else {
 		fmt.Printf("  %sScan complete. No immediate issues found.%s\n", colorGreen, colorReset)
 	}

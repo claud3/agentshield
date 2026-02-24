@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/claud3/agentshield/internal/compliance"
 	"github.com/claud3/agentshield/internal/report"
 	"github.com/claud3/agentshield/internal/scanner"
 	"github.com/claud3/agentshield/internal/secrets"
@@ -44,10 +45,14 @@ func main() {
 	// Phase 2: Detect credentials in discovered configs
 	findings := secrets.Detect(scanResult, patterns)
 
-	// Phase 3: Output results
+	// Phase 3: Run MCP Security Benchmark
+	benchmark := compliance.RunBenchmark(scanResult, findings)
+
+	// Phase 4: Output results
 	result := report.Result{
 		ScanResult: scanResult,
 		Findings:   findings,
+		Benchmark:  benchmark,
 	}
 
 	if *jsonOutput {
