@@ -244,8 +244,95 @@ func TestExtractMCPServers_TypeInference(t *testing.T) {
 	if byName["local-tool"].Type != "stdio" {
 		t.Errorf("local-tool: expected inferred type stdio, got %s", byName["local-tool"].Type)
 	}
-	if byName["remote-api"].Type != "url" {
-		t.Errorf("remote-api: expected inferred type url, got %s", byName["remote-api"].Type)
+	if byName["remote-api"].Type != "http" {
+		t.Errorf("remote-api: expected inferred type http, got %s", byName["remote-api"].Type)
+	}
+}
+
+func TestInferTransportType(t *testing.T) {
+	tests := []struct {
+		url      string
+		expected string
+	}{
+		// SSE endpoints
+		{"https://mcp.atlassian.com/v1/sse", "sse"},
+		{"https://mcp.github.com/sse", "sse"},
+		{"https://example.com/v1/sse/connect", "sse"},
+
+		// Streamable HTTP endpoints
+		{"https://mcp.honeycomb.io/mcp", "http"},
+		{"https://mcp.vercel.com", "http"},
+		{"https://mcp.atlassian.com/v1/mcp", "http"},
+		{"https://workspace.databricks.com/api/2.0/mcp/sql", "http"},
+		{"https://api.example.com/v1/http", "http"},
+		{"http://127.0.0.1:3845/mcp", "http"},
+	}
+
+	for _, tt := range tests {
+		got := inferTransportType(tt.url)
+		if got != tt.expected {
+			t.Errorf("inferTransportType(%q) = %q, want %q", tt.url, got, tt.expected)
+		}
+	}
+}
+
+func TestNormalizeTransportType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"stdio", "stdio"},
+		{"sse", "sse"},
+		{"http", "http"},
+		{"url", "http"},
+		{"streamable-http", "http"},
+		{"streamablehttp", "http"},
+		{"SSE", "sse"},
+		{"STDIO", "stdio"},
+	}
+
+	for _, tt := range tests {
+		got := normalizeTransportType(tt.input)
+		if got != tt.expected {
+			t.Errorf("normalizeTransportType(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestExtractMCPServers_SSEInference(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "mcp.json")
+
+	config := `{
+		"mcpServers": {
+			"atlassian-sse": {
+				"url": "https://mcp.atlassian.com/v1/sse"
+			},
+			"github-sse": {
+				"url": "https://mcp.github.com/sse"
+			},
+			"honeycomb-http": {
+				"url": "https://mcp.honeycomb.io/mcp"
+			}
+		}
+	}`
+	os.WriteFile(configPath, []byte(config), 0644)
+
+	servers := extractMCPServers("claude-code", configPath)
+
+	byName := make(map[string]MCPServer)
+	for _, s := range servers {
+		byName[s.Name] = s
+	}
+
+	if byName["atlassian-sse"].Type != "sse" {
+		t.Errorf("atlassian-sse: expected type sse, got %s", byName["atlassian-sse"].Type)
+	}
+	if byName["github-sse"].Type != "sse" {
+		t.Errorf("github-sse: expected type sse, got %s", byName["github-sse"].Type)
+	}
+	if byName["honeycomb-http"].Type != "http" {
+		t.Errorf("honeycomb-http: expected type http, got %s", byName["honeycomb-http"].Type)
 	}
 }
 

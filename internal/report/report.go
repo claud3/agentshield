@@ -108,23 +108,33 @@ func printMCPServers(result *scanner.ScanResult) {
 	fmt.Printf("%s── MCP Servers ───────────────────────────────────────────%s\n", colorDim, colorReset)
 
 	stdioCount := 0
-	urlCount := 0
+	httpCount := 0
+	sseCount := 0
 	for _, s := range result.MCPServers {
-		if s.Type == "stdio" {
+		switch s.Type {
+		case "stdio":
 			stdioCount++
-		} else {
-			urlCount++
+		case "sse":
+			sseCount++
+		default:
+			httpCount++
 		}
 	}
 
 	fmt.Printf("  stdio (local):   %s%d%s\n", colorBold, stdioCount, colorReset)
-	fmt.Printf("  url (remote):    %s%d%s\n", colorBold, urlCount, colorReset)
+	fmt.Printf("  http (remote):   %s%d%s\n", colorBold, httpCount, colorReset)
+	if sseCount > 0 {
+		fmt.Printf("  sse (remote):    %s%d%s\n", colorBold, sseCount, colorReset)
+	}
 	fmt.Println()
 
 	for _, s := range result.MCPServers {
 		typeColor := colorBlue
-		if s.Type == "stdio" {
+		switch s.Type {
+		case "stdio":
 			typeColor = colorCyan
+		case "sse":
+			typeColor = colorYellow
 		}
 		fmt.Printf("  %s[%s]%s %s%s%s\n", typeColor, s.Type, colorReset, colorBold, s.Name, colorReset)
 		fmt.Printf("    %sTool:%s %s\n", colorDim, colorReset, s.Tool)

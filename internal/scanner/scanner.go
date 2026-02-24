@@ -330,10 +330,12 @@ func parseServerFromMap(name, tool, configPath string, serverMap map[string]inte
 	// Infer type if not set
 	if server.Type == "" {
 		if server.URL != "" {
-			server.Type = "url"
+			server.Type = inferTransportType(server.URL)
 		} else if server.Command != "" {
 			server.Type = "stdio"
 		}
+	} else {
+		server.Type = normalizeTransportType(server.Type)
 	}
 
 	return server
@@ -397,10 +399,12 @@ func parseMCPServersMap(tool, configPath, projectPath string, mcpServersRaw json
 			// Infer type from content if not explicitly set
 			if server.Type == "" {
 				if server.URL != "" {
-					server.Type = "url"
+					server.Type = inferTransportType(server.URL)
 				} else if server.Command != "" {
 					server.Type = "stdio"
 				}
+			} else {
+				server.Type = normalizeTransportType(server.Type)
 			}
 		}
 
@@ -408,6 +412,44 @@ func parseMCPServersMap(tool, configPath, projectPath string, mcpServersRaw json
 	}
 
 	return servers
+}
+
+// inferTransportType determines the MCP transport type from a URL.
+// MCP defines three transports: stdio (local process), sse (Server-Sent Events),
+// and http (streamable HTTP). This function classifies URL-based transports.
+func inferTransportType(url string) string {
+	lower := strings.ToLower(url)
+
+	// SSE endpoints typically end with /sse
+	if strings.HasSuffix(lower, "/sse") {
+		return "sse"
+	}
+
+	// Explicit SSE in path segments (e.g., /v1/sse/something)
+	if strings.Contains(lower, "/sse/") {
+		return "sse"
+	}
+
+	// Everything else with a URL is streamable HTTP
+	return "http"
+}
+
+// normalizeTransportType ensures the type field uses the canonical MCP
+// transport names: stdio, sse, http. Handles legacy/variant values.
+func normalizeTransportType(t string) string {
+	switch strings.ToLower(t) {
+	case "stdio":
+		return "stdio"
+	case "sse":
+		return "sse"
+	case "http", "streamable-http", "streamablehttp":
+		return "http"
+	case "url":
+		// Legacy "url" type — can't distinguish without the URL itself
+		return "http"
+	default:
+		return t
+	}
 }
 
 // expandPath expands ~ and environment variables in paths.
