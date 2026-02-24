@@ -61,7 +61,7 @@ agentshield-scan --configs /path/to/configs
 ╚══════════════════════════════════════════════════════════╝
 
 ── Endpoint ──────────────────────────────────────────────
-  Hostname:  ENG-LAPTOP-42
+  Hostname:  LAPTOP-42
   Platform:  darwin
   User:      jane.doe
 
