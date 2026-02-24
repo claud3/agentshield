@@ -14,18 +14,30 @@ AgentShield Scanner inspects your machine for AI coding tool configurations and 
 
 ## Install
 
-### From source
+### Quick install (macOS/Linux)
+
+```bash
+curl -sSfL https://github.com/claud3/agentshield/releases/latest/download/agentshield-scan-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o agentshield-scan
+chmod +x agentshield-scan
+sudo mv agentshield-scan /usr/local/bin/
+```
+
+### Using Go
 
 ```bash
 go install github.com/claud3/agentshield/cmd/agentshield-scan@latest
 ```
+
+> **Note:** This installs to `~/go/bin/`. Make sure it's in your PATH:
+> `export PATH="$HOME/go/bin:$PATH"` (add to your `~/.zshrc` or `~/.bashrc`)
 
 ### Build from repo
 
 ```bash
 git clone https://github.com/claud3/agentshield.git
 cd agentshield
-go build ./cmd/agentshield-scan/
+go build -o agentshield-scan ./cmd/agentshield-scan/
+./agentshield-scan
 ```
 
 ## Usage
