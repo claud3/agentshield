@@ -42,13 +42,25 @@ jobs:
           VERSION=${{ steps.release.outputs.VERSION }}
           FORMULA="homebrew-tap/Formula/agentshield-scan.rb"
 
+          # Update version
           sed -i "s/version \".*\"/version \"${VERSION}\"/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_DARWIN_ARM64/${SHA_DARWIN_ARM64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_DARWIN_AMD64/${SHA_DARWIN_AMD64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_LINUX_ARM64/${SHA_LINUX_ARM64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_LINUX_AMD64/${SHA_LINUX_AMD64}/" "$FORMULA"
 
-          # Also replace any previous real hashes
+          # Replace SHA256 hashes positionally (darwin-arm64, darwin-amd64, linux-arm64, linux-amd64)
+          # Use awk to replace the Nth sha256 occurrence
+          awk -v sha1="${SHA_DARWIN_ARM64}" \
+              -v sha2="${SHA_DARWIN_AMD64}" \
+              -v sha3="${SHA_LINUX_ARM64}" \
+              -v sha4="${SHA_LINUX_AMD64}" '
+          BEGIN { n=0 }
+          /sha256 "/ {
+            n++
+            if (n==1) { sub(/"[a-f0-9]{64}"/, "\"" sha1 "\"") }
+            if (n==2) { sub(/"[a-f0-9]{64}"/, "\"" sha2 "\"") }
+            if (n==3) { sub(/"[a-f0-9]{64}"/, "\"" sha3 "\"") }
+            if (n==4) { sub(/"[a-f0-9]{64}"/, "\"" sha4 "\"") }
+          }
+          { print }' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
+
           cd homebrew-tap
           git diff
 
