@@ -1,0 +1,18 @@
+# Binaries (root-level only, not cmd/ source directories)
+/agentshield-scan
+/agentshield
+*.exe
+
+# Go
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo

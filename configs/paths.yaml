@@ -1,0 +1,154 @@
+# AgentShield - AI Tool Configuration Paths
+# Defines where each AI coding tool stores its configuration files per platform.
+# Used by the scanner to discover MCP servers, settings, and managed configs.
+
+macos:
+  tools:
+    - tool: claude-code
+      config_paths:
+        - "~/.claude.json"
+        - "~/.claude/settings.json"
+        - ".claude/settings.json"
+        - ".claude/settings.local.json"
+        - ".mcp.json"
+      managed_paths:
+        - "/Library/Application Support/ClaudeCode/managed-settings.json"
+        - "/Library/Application Support/ClaudeCode/managed-mcp.json"
+
+    - tool: claude-desktop
+      config_paths:
+        - "~/Library/Application Support/Claude/claude_desktop_config.json"
+
+    - tool: cursor
+      config_paths:
+        - "~/.cursor/mcp.json"
+        - ".cursor/mcp.json"
+
+    - tool: vscode-copilot
+      config_paths:
+        - ".vscode/mcp.json"
+        - ".vscode/settings.json"
+        - "~/Library/Application Support/Code/User/settings.json"
+
+    - tool: codex-cli
+      config_paths:
+        - "~/.codex/config.toml"
+        - ".codex/config.toml"
+      managed_paths:
+        - "/etc/codex/requirements.toml"
+        - "/etc/codex/managed_config.toml"
+
+    - tool: windsurf
+      config_paths:
+        - "~/.codeium/windsurf/mcp_config.json"
+
+    - tool: continue-dev
+      config_paths:
+        - "~/.continue/config.json"
+
+    - tool: aider
+      config_paths:
+        - "~/.aider.conf.yml"
+
+    - tool: zed
+      config_paths:
+        - "~/.config/zed/settings.json"
+
+    - tool: jetbrains-ai
+      config_paths:
+        - "~/Library/Application Support/JetBrains/IntelliJIdea*/options/ai-assistant.xml"
+
+linux:
+  tools:
+    - tool: claude-code
+      config_paths:
+        - "~/.claude.json"
+        - "~/.claude/settings.json"
+        - ".claude/settings.json"
+        - ".claude/settings.local.json"
+        - ".mcp.json"
+      managed_paths:
+        - "/etc/claude-code/managed-settings.json"
+        - "/etc/claude-code/managed-mcp.json"
+
+    - tool: cursor
+      config_paths:
+        - "~/.cursor/mcp.json"
+        - ".cursor/mcp.json"
+
+    - tool: vscode-copilot
+      config_paths:
+        - ".vscode/mcp.json"
+        - ".vscode/settings.json"
+        - "~/.config/Code/User/settings.json"
+
+    - tool: codex-cli
+      config_paths:
+        - "~/.codex/config.toml"
+        - ".codex/config.toml"
+      managed_paths:
+        - "/etc/codex/requirements.toml"
+        - "/etc/codex/managed_config.toml"
+
+    - tool: windsurf
+      config_paths:
+        - "~/.codeium/windsurf/mcp_config.json"
+
+    - tool: continue-dev
+      config_paths:
+        - "~/.continue/config.json"
+
+    - tool: aider
+      config_paths:
+        - "~/.aider.conf.yml"
+
+    - tool: zed
+      config_paths:
+        - "~/.config/zed/settings.json"
+
+windows:
+  tools:
+    - tool: claude-code
+      config_paths:
+        - "~/.claude.json"
+        - "~/.claude/settings.json"
+        - ".claude/settings.json"
+        - ".claude/settings.local.json"
+        - ".mcp.json"
+      managed_paths:
+        - "C:\\Program Files\\ClaudeCode\\managed-settings.json"
+        - "C:\\Program Files\\ClaudeCode\\managed-mcp.json"
+        - "C:\\ProgramData\\ClaudeCode\\managed-settings.json"
+        - "C:\\ProgramData\\ClaudeCode\\managed-mcp.json"
+
+    - tool: cursor
+      config_paths:
+        - "~/.cursor/mcp.json"
+        - ".cursor/mcp.json"
+
+    - tool: vscode-copilot
+      config_paths:
+        - ".vscode/mcp.json"
+        - ".vscode/settings.json"
+        - "~/AppData/Roaming/Code/User/settings.json"
+
+    - tool: codex-cli
+      config_paths:
+        - "~/.codex/config.toml"
+        - ".codex/config.toml"
+
+    - tool: windsurf
+      config_paths:
+        - "~/.codeium/windsurf/mcp_config.json"
+
+    - tool: continue-dev
+      config_paths:
+        - "~/.continue/config.json"
+
+    - tool: aider
+      config_paths:
+        - "~/.aider.conf.yml"
+
+    - tool: zed
+      config_paths:
+        - "~/.config/zed/settings.json"
