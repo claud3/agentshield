@@ -381,6 +381,30 @@ func defaultPatterns() *PatternConfig {
 				Regex:       `[Bb]asic\s+[A-Za-z0-9+/=]{20,}`,
 				Description: "Basic auth credentials (base64 encoded)",
 			},
+			{
+				Name:        "private_key_header",
+				Vendor:      "unknown",
+				Type:        "private_key",
+				Severity:    SeverityCritical,
+				Regex:       `-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----`,
+				Description: "Private key embedded in configuration",
+			},
+			{
+				Name:        "allow_http_flag",
+				Vendor:      "unknown",
+				Type:        "insecure_transport",
+				Severity:    SeverityMedium,
+				Regex:       `--allow-http`,
+				Description: "Insecure HTTP transport explicitly allowed",
+			},
+			{
+				Name:        "allow_insecure_host",
+				Vendor:      "unknown",
+				Type:        "insecure_transport",
+				Severity:    SeverityMedium,
+				Regex:       `--allow-insecure-host`,
+				Description: "TLS verification bypassed for specific host",
+			},
 		},
 	}
 

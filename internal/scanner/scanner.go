@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/BurntSushi/toml"
+	"gopkg.in/yaml.v3"
 )
 
 // ToolConfig represents a discovered AI tool configuration file.
@@ -149,7 +152,30 @@ func scanManagedConfig(tool, path string) ManagedConfig {
 }
 
 // extractMCPServers parses a config file and extracts MCP server entries.
+// Dispatches to the appropriate parser based on file extension.
 func extractMCPServers(tool, path string) []MCPServer {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".json":
+		return extractMCPServersJSON(tool, path)
+	case ".toml":
+		return extractMCPServersTOML(tool, path)
+	case ".yaml", ".yml":
+		return extractMCPServersYAML(tool, path)
+	default:
+		// Try JSON first (most common), fall back to TOML, then YAML
+		if servers := extractMCPServersJSON(tool, path); servers != nil {
+			return servers
+		}
+		if servers := extractMCPServersTOML(tool, path); servers != nil {
+			return servers
+		}
+		return extractMCPServersYAML(tool, path)
+	}
+}
+
+// extractMCPServersJSON handles JSON config files.
+func extractMCPServersJSON(tool, path string) []MCPServer {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -184,6 +210,133 @@ func extractMCPServers(tool, path string) []MCPServer {
 	}
 
 	return servers
+}
+
+// extractMCPServersTOML handles TOML config files (e.g. Codex CLI).
+// Expected structure:
+//
+//	[mcp_servers.server-name]
+//	type = "stdio"
+//	command = "/path/to/binary"
+//	args = ["arg1", "arg2"]
+//
+//	[mcp_servers.server-name.env]
+//	KEY = "value"
+func extractMCPServersTOML(tool, path string) []MCPServer {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	var raw map[string]interface{}
+	if err := toml.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+
+	return extractMCPServersFromGenericMap(tool, path, raw)
+}
+
+// extractMCPServersYAML handles YAML config files (e.g. Aider).
+func extractMCPServersYAML(tool, path string) []MCPServer {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+
+	return extractMCPServersFromGenericMap(tool, path, raw)
+}
+
+// extractMCPServersFromGenericMap extracts MCP servers from a generic map
+// (works with TOML and YAML parsed data). Looks for keys: mcpServers, mcp_servers,
+// mcpservers (case variations common across tools).
+func extractMCPServersFromGenericMap(tool, path string, raw map[string]interface{}) []MCPServer {
+	var servers []MCPServer
+
+	// Try common key names for MCP server blocks
+	mcpKeys := []string{"mcpServers", "mcp_servers", "mcpservers", "mcp-servers"}
+	for _, key := range mcpKeys {
+		if serversMap, ok := raw[key]; ok {
+			if sm, ok := serversMap.(map[string]interface{}); ok {
+				for name, serverVal := range sm {
+					if serverMap, ok := serverVal.(map[string]interface{}); ok {
+						server := parseServerFromMap(name, tool, path, serverMap)
+						servers = append(servers, server)
+					}
+				}
+			}
+		}
+	}
+
+	return servers
+}
+
+// parseServerFromMap builds an MCPServer from a generic map[string]interface{}.
+func parseServerFromMap(name, tool, configPath string, serverMap map[string]interface{}) MCPServer {
+	server := MCPServer{
+		Name:       name,
+		Tool:       tool,
+		ConfigPath: configPath,
+	}
+
+	// Marshal the map back to JSON for RawConfig
+	if raw, err := json.Marshal(serverMap); err == nil {
+		server.RawConfig = raw
+	}
+
+	if t, ok := serverMap["type"].(string); ok {
+		server.Type = t
+	}
+	if cmd, ok := serverMap["command"].(string); ok {
+		server.Command = cmd
+	}
+	if u, ok := serverMap["url"].(string); ok {
+		server.URL = u
+	}
+
+	// Handle args ([]interface{} from TOML/YAML)
+	if args, ok := serverMap["args"].([]interface{}); ok {
+		for _, a := range args {
+			if s, ok := a.(string); ok {
+				server.Args = append(server.Args, s)
+			}
+		}
+	}
+
+	// Handle env
+	if envMap, ok := serverMap["env"].(map[string]interface{}); ok {
+		server.Env = make(map[string]string)
+		for k, v := range envMap {
+			if s, ok := v.(string); ok {
+				server.Env[k] = s
+			}
+		}
+	}
+
+	// Handle headers
+	if hdrMap, ok := serverMap["headers"].(map[string]interface{}); ok {
+		server.Headers = make(map[string]string)
+		for k, v := range hdrMap {
+			if s, ok := v.(string); ok {
+				server.Headers[k] = s
+			}
+		}
+	}
+
+	// Infer type if not set
+	if server.Type == "" {
+		if server.URL != "" {
+			server.Type = "url"
+		} else if server.Command != "" {
+			server.Type = "stdio"
+		}
+	}
+
+	return server
 }
 
 // parseMCPServersMap parses a {"serverName": {...}} map into MCPServer entries.
