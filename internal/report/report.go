@@ -38,9 +38,10 @@ func init() {
 
 // Result combines scan results, security findings, and benchmark report.
 type Result struct {
-	ScanResult *scanner.ScanResult        `json:"scan_result"`
-	Findings   []secrets.Finding          `json:"findings"`
-	Benchmark  *compliance.BenchmarkReport `json:"benchmark,omitempty"`
+	ScannerVersion string                     `json:"scanner_version,omitempty"`
+	ScanResult     *scanner.ScanResult        `json:"scan_result"`
+	Findings       []secrets.Finding          `json:"findings"`
+	Benchmark      *compliance.BenchmarkReport `json:"benchmark,omitempty"`
 }
 
 // HasCriticalFindings returns true if any finding is critical severity.
